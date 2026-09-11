@@ -56,12 +56,9 @@ void show_startup_message(std::string machine_name)
  */
 int config_handler(sockaddr_in *machine_address, sockaddr_in *peer_addresses)
 {
-    std::string path;
-    std::ifstream *config_file;
+    std::string path = get_path();
 
-    // Ask for the file path
-    std::cout << "Digite o path do arquivo de configuração: ";
-    std::cin >> path;
+    std::ifstream *config_file;
 
     // Try to open the file
     if (get_config_file(path, &config_file) == -1)
@@ -90,6 +87,20 @@ int config_handler(sockaddr_in *machine_address, sockaddr_in *peer_addresses)
 
     return 0;
 };
+
+/**
+ * 
+ */
+std::string get_path() {
+    std::string path;
+
+    // Ask for the file path
+    std::cout << "Digite o path do arquivo de configuração: ";
+
+    std::cin >> path;
+
+    return path;
+}
 
 /**
  * Opens a file provided by the user
