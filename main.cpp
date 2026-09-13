@@ -44,7 +44,18 @@ int main(int argc, char *argv[])
     if (server.start() == -1)
         return -1;
 
-    // tentar conectar com as demais ao startar
+    std::cout << "Servidor inicializado!" << std::endl << std::endl;
+
+    // iniciar o filesystem
+
+    // fazer snapshot do filesystem
+
+    // Main loop
+    while (true) {
+        break;
+    }
+
+    std::cout << "Programa finalizado!" << std::endl;
 
     return 0;
 }
