@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
     sockaddr_in machine_address;
     std::vector<sockaddr_in> peer_addresses;
 
+    // Clean the memory structure for machine_address
     memset(&machine_address, 0, sizeof(sockaddr_in));
 
     // Try to open and read a provided config file
