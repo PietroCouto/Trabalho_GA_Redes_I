@@ -7,7 +7,7 @@
       "request": "launch",
       "program": "${workspaceRoot}/compiled/main",
       "args": [
-        "peer A"
+        "Peer A"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
