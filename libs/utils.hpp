@@ -12,6 +12,7 @@
  */
 void show_startup_message(std::string machine_name);
 void clear_screen();
+int error_message(std::string error_message);
 
 /**
  * Shows the program startup message
@@ -30,5 +31,10 @@ void clear_screen()
 {
     system("clear");
 }
+
+int error_message(std::string error_message) {
+    std::cout << error_message << std::endl;
+    return -1;
+};
 
 #endif
