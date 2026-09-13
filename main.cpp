@@ -3,11 +3,7 @@
  */
 
 #include <iostream>
-#include <string>
 #include <netinet/in.h>
-#include <bits/stdc++.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <vector>
 
 /**
@@ -15,6 +11,7 @@
  */
 #include "./libs/utils.hpp"
 #include "./libs/config_handler/config_handler.cpp"
+#include "./libs/server.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -36,7 +33,16 @@ int main(int argc, char *argv[])
     if (config_handler(&machine_address, &peer_addresses, argv[1]) == -1)
         return -1;
 
-    // configurar a maquina
+    // Check if the machine has been found on the file
+    if (machine_address.sin_addr.s_addr == 0 && machine_address.sin_port == 0)
+        return error_message("Máquina não encontrada no arquivo de configuração!");
+
+    // Create the server object
+    Server server(argv[1], machine_address);
+
+    // Try to start the server
+    if (server.start() == -1)
+        return -1;
 
     // tentar conectar com as demais ao startar
 
