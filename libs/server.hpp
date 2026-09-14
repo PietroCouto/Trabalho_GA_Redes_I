@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <queue>
+#include <unistd.h>
 
 /**
  * Handmade libs
@@ -63,6 +64,7 @@ Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> p
     this->address = address;
     this->message_queue = std::queue<std::string>();
     this->peer_addresses = peer_addresses;
+    this->socket_fd = -1;
 };
 
 /**
