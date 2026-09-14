@@ -93,12 +93,44 @@ int Server::start()
     return 0;
 }
 
-int Server::listen() {
-    char *message[1472];
+/**
+ * Listen for messages on the server socket
+ * @returns -1 for error, 0 for success
+ */
+int Server::listen()
+{
+    // Variables to store the sender address
+    sockaddr_in sender_address;
+    socklen_t sender_address_size;
 
-    while (true) {
-        if (recvfrom(this->socket_fd, message, sizeof(message), 0) == -1)
-            return -1;
+    // Variables to store the message
+    char message[1472];
+    int bytes_received = 0;
+
+    // Keep the function alive
+    while (true)
+    {
+        // Clean the memory structure for machine_address
+        memset(&sender_address, 0, sizeof(sockaddr_in));
+
+        // Clean message memory
+        memset(&message, 0, sizeof(message));
+
+        // Get the size of the address structure
+        sender_address_size = sizeof(sender_address);
+
+        // Receive messages from the socket
+        bytes_received = recvfrom(this->socket_fd, message, sizeof(message) - 1, 0, (struct sockaddr *)&sender_address, &sender_address_size);
+
+        // Check for errors
+        if (bytes_received == -1)
+            continue;
+
+        // Valid messages need to have the string terminator set
+        message[bytes_received] = '\0';
+
+        // Push the message into the queue
+        this->message_queue.push(std::string(message));
     }
 }
 

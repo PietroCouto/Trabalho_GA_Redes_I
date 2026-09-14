@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
         return -1;
 
     // Check if the machine has been found on the file
-    if (machine_address.sin_addr.s_addr == 0 && machine_address.sin_port == 0)
+    if (machine_address.sin_addr.s_addr == 0 || machine_address.sin_port == 0)
         return error_message("Máquina não encontrada no arquivo de configuração!");
 
     // Create the server object
@@ -52,6 +52,8 @@ int main(int argc, char *argv[])
 
     // Main loop
     while (true) {
+        server.listen();
+        
         break;
     }
 
