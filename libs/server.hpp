@@ -159,7 +159,10 @@ bool Server::has_message()
  */
 std::string Server::get_message()
 {
-    return message_queue.front();
+    if (this->has_message())
+        return message_queue.front();
+
+    return "";
 }
 
 /**
