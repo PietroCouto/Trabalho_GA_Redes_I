@@ -133,6 +133,7 @@ int Server::listen()
         bytes_received = recvfrom(this->socket_fd, message, sizeof(message) - 1, 0, (struct sockaddr *)&sender_address, &sender_address_size);
 
         // Check for errors
+        // TODO deal with errors
         if (bytes_received == -1)
             continue;
 
@@ -141,6 +142,8 @@ int Server::listen()
 
         // Push the message into the queue
         this->message_queue.push(std::string(message));
+
+        // TODO if the address is not on the peer list, add it
     }
 
     return 0;
@@ -177,6 +180,7 @@ int Server::broadcast(std::string message)
     for (int i = 0; i < this->peer_addresses.size(); i++)
     {
         // Send the message to the current peer
+        // TODO deal with errors
         sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&this->peer_addresses.at(i), sizeof(this->peer_addresses.at(i)));
     }
 
