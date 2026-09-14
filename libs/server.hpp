@@ -51,6 +51,8 @@ private:
 
     // TODO converter a queue em uma estrutura que armazene o endereço do remetente
     std::queue<std::string> message_queue;
+
+    // TODO adicionar mutex para a fila
 };
 
 /**
@@ -164,8 +166,17 @@ bool Server::has_message()
  */
 std::string Server::get_message()
 {
+    // Check if there is a message on the queue
     if (this->has_message())
-        return message_queue.front();
+    {
+        // Extract the message
+        std::string message = message_queue.front();
+
+        // Remove the message from the queue
+        message_queue.pop();
+
+        return message;
+    }
 
     return "";
 }

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <netinet/in.h>
 #include <vector>
+#include <thread>
 
 /**
  * Handmade libs
@@ -44,20 +45,34 @@ int main(int argc, char *argv[])
     if (server.start() == -1)
         return -1;
 
-    std::cout << "Servidor inicializado!" << std::endl << std::endl;
+    std::cout << "Servidor inicializado!" << std::endl;
+    std::cout << std::endl;
 
     // iniciar o filesystem
 
     // fazer snapshot do filesystem
-    
-    // Main loop
-    while (true) {
-        server.listen();
 
-        break;
+    // Start the listening thread
+    std::thread listening_thread(&Server::listen, &server);
+
+    server.broadcast("teste");
+
+    // Main loop
+    while (true)
+    {
+        if (server.has_message())
+        {
+            std::cout << "Mensagem!" << std::endl;
+            server.get_message();
+        }
     }
 
+    // Join the thread upon ending
+    listening_thread.join();
+
+    // Show ending message
     std::cout << "Programa finalizado!" << std::endl;
+    std::cout << std::endl;
 
     return 0;
 }
