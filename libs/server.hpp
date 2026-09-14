@@ -34,6 +34,9 @@ public:
      */
     int start();
     int listen();
+    int broadcast(char message[1472]);
+    bool has_message();
+    std::string get_message();
 
 private:
     /**
@@ -42,6 +45,8 @@ private:
     sockaddr_in address;
     std::string name;
     int socket_fd;
+
+    // TODO converter a queue em uma estrutura que armazene o endereço do remetente
     std::queue<std::string> message_queue;
 };
 
@@ -132,6 +137,32 @@ int Server::listen()
         // Push the message into the queue
         this->message_queue.push(std::string(message));
     }
+
+    return 0;
+}
+
+/**
+ * Check if the server has queued messages
+ * @returns Boolean
+ */
+bool Server::has_message() {
+    return this->message_queue.size() != 0;
+}
+
+/**
+ * Get the next message on the queue
+ * @returns The next message on the queue
+ */
+std::string Server::get_message() {
+    return message_queue.front();
+}
+
+/**
+ * Broadcast a message to every peer on the network
+ */
+int Server::broadcast(char message[1472]) {
+    sendto(this->socket_fd, message, sizeof(message), 0,);
+    return 0;
 }
 
 #endif

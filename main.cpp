@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
     // Main loop
     while (true) {
         server.listen();
-        
+
         break;
     }
 
