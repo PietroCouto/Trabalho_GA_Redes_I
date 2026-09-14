@@ -22,7 +22,7 @@ public:
     /**
      * Constructors
      */
-    Server(std::string name, sockaddr_in address);
+    Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> peer_addresses);
 
     /**
      * Destructor
@@ -34,7 +34,7 @@ public:
      */
     int start();
     int listen();
-    int broadcast(char message[1472]);
+    int broadcast(std::string message);
     bool has_message();
     std::string get_message();
 
@@ -45,6 +45,7 @@ private:
     sockaddr_in address;
     std::string name;
     int socket_fd;
+    std::vector<sockaddr_in> peer_addresses;
 
     // TODO converter a queue em uma estrutura que armazene o endereço do remetente
     std::queue<std::string> message_queue;
@@ -55,11 +56,11 @@ private:
  * @param name The server's name
  * @param address The server's adress
  */
-Server::Server(std::string name, sockaddr_in address)
-{
+Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> peer_addresses) {
     this->name = name;
     this->address = address;
     this->message_queue = std::queue<std::string>();
+    this->peer_addresses = peer_addresses;
 };
 
 /**
@@ -134,6 +135,8 @@ int Server::listen()
         // Valid messages need to have the string terminator set
         message[bytes_received] = '\0';
 
+        std::cout << std::string(message) << std::endl;
+
         // Push the message into the queue
         this->message_queue.push(std::string(message));
     }
@@ -145,7 +148,8 @@ int Server::listen()
  * Check if the server has queued messages
  * @returns Boolean
  */
-bool Server::has_message() {
+bool Server::has_message()
+{
     return this->message_queue.size() != 0;
 }
 
@@ -153,15 +157,20 @@ bool Server::has_message() {
  * Get the next message on the queue
  * @returns The next message on the queue
  */
-std::string Server::get_message() {
+std::string Server::get_message()
+{
     return message_queue.front();
 }
 
 /**
  * Broadcast a message to every peer on the network
  */
-int Server::broadcast(char message[1472]) {
-    sendto(this->socket_fd, message, sizeof(message), 0,);
+int Server::broadcast(std::string message)
+{
+    for (int i = 0; i < this->peer_addresses.size(); i++) {
+        sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&this->peer_addresses.at(i), sizeof(this->peer_addresses.at(i)));
+    }
+
     return 0;
 }
 

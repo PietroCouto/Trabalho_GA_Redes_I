@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
         return error_message("Máquina não encontrada no arquivo de configuração!");
 
     // Create the server object
-    Server server(argv[1], machine_address);
+    Server server(argv[1], machine_address, peer_addresses);
 
     // Try to start the server
     if (server.start() == -1)
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     // iniciar o filesystem
 
     // fazer snapshot do filesystem
-
+    
     // Main loop
     while (true) {
         server.listen();
