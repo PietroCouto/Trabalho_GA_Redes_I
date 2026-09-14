@@ -35,6 +35,7 @@ public:
     int start();
     int listen();
     int broadcast(std::string message);
+    int send_message(std::string message, sockaddr_in destination_address);
     bool has_message();
     std::string get_message();
 
@@ -56,7 +57,8 @@ private:
  * @param name The server's name
  * @param address The server's adress
  */
-Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> peer_addresses) {
+Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> peer_addresses)
+{
     this->name = name;
     this->address = address;
     this->message_queue = std::queue<std::string>();
@@ -135,8 +137,6 @@ int Server::listen()
         // Valid messages need to have the string terminator set
         message[bytes_received] = '\0';
 
-        std::cout << std::string(message) << std::endl;
-
         // Push the message into the queue
         this->message_queue.push(std::string(message));
     }
@@ -164,14 +164,33 @@ std::string Server::get_message()
 
 /**
  * Broadcast a message to every peer on the network
+ * @param message The message to be sent
  */
 int Server::broadcast(std::string message)
 {
-    for (int i = 0; i < this->peer_addresses.size(); i++) {
+    // Iterate every peer
+    for (int i = 0; i < this->peer_addresses.size(); i++)
+    {
+        // Send the message to the current peer
         sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&this->peer_addresses.at(i), sizeof(this->peer_addresses.at(i)));
     }
 
     return 0;
 }
+
+/**
+ * Send a message to a specific destination
+ * @param message The message to be sent
+ * @param destination_address The address of the destination
+ * @returns -1 for error, 0 for success
+ */
+int Server::send_message(std::string message, sockaddr_in destination_address)
+{
+    // Try to send the message to the destination
+    if (sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&destination_address, sizeof(destination_address)) == -1)
+        return -1;
+
+    return 0;
+};
 
 #endif
