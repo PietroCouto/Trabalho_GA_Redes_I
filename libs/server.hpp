@@ -17,6 +17,15 @@
  */
 #include "./utils.hpp"
 
+struct package
+{
+    std::string message;
+    sockaddr_in sender_address;
+};
+
+/**
+ * Class for handling the conections
+ */
 class Server
 {
 public:
@@ -38,7 +47,7 @@ public:
     int broadcast(std::string message);
     int send_message(std::string message, sockaddr_in destination_address);
     bool has_message();
-    std::string get_message();
+    package get_message();
     int get_listening_error_count();
     int get_broadcasting_error_count();
 
@@ -55,7 +64,7 @@ private:
     std::mutex mtx;
 
     // TODO converter a queue em uma estrutura que armazene o endereço do remetente
-    std::queue<std::string> message_queue;
+    std::queue<package> message_queue;
 
     /**
      * Methods
@@ -72,7 +81,7 @@ Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> p
 {
     this->name = name;
     this->address = address;
-    this->message_queue = std::queue<std::string>();
+    this->message_queue = std::queue<package>();
     this->peer_addresses = peer_addresses;
     this->socket_fd = -1;
     this->listening_error_count = 0;
@@ -162,7 +171,7 @@ int Server::listen()
         this->mtx.lock();
 
         // Push the message into the queue
-        this->message_queue.push(std::string(message));
+        this->message_queue.push(package{std::string(message), sender_address});
 
         // Unlock the mutex
         this->mtx.unlock();
@@ -201,7 +210,7 @@ bool Server::has_message()
  * Get the next message on the queue
  * @returns The next message on the queue
  */
-std::string Server::get_message()
+package Server::get_message()
 {
     // Check if there is a message on the queue
     if (this->has_message())
@@ -210,7 +219,7 @@ std::string Server::get_message()
         this->mtx.lock();
 
         // Extract the message
-        std::string message = message_queue.front();
+        package message = message_queue.front();
 
         // Remove the message from the queue
         message_queue.pop();
@@ -221,7 +230,7 @@ std::string Server::get_message()
         return message;
     }
 
-    return "";
+    return package{};
 }
 
 /**

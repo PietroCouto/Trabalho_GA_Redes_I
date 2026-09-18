@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     {
         if (server.has_message())
         {
-            std::cout << server.get_message() << std::endl;
+            std::cout << server.get_message().message << std::endl;
         }
     }
 
