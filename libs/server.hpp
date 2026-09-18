@@ -39,6 +39,7 @@ public:
     int send_message(std::string message, sockaddr_in destination_address);
     bool has_message();
     std::string get_message();
+    int get_listening_error_count();
 
 private:
     /**
@@ -48,11 +49,17 @@ private:
     std::string name;
     int socket_fd;
     std::vector<sockaddr_in> peer_addresses;
+    int listening_error_count;
 
     // TODO converter a queue em uma estrutura que armazene o endereço do remetente
     std::queue<std::string> message_queue;
 
     // TODO adicionar mutex para a fila
+
+    /**
+     * Methods
+     */
+    bool is_new_address(sockaddr_in new_address);
 };
 
 /**
@@ -67,6 +74,7 @@ Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> p
     this->message_queue = std::queue<std::string>();
     this->peer_addresses = peer_addresses;
     this->socket_fd = -1;
+    this->listening_error_count = 0;
 };
 
 /**
@@ -84,6 +92,10 @@ Server::~Server()
         this->socket_fd = -1;
     }
 };
+
+/**
+ * Methods
+ */
 
 /**
  * Starts the server
@@ -137,7 +149,10 @@ int Server::listen()
         // Check for errors
         // TODO deal with errors
         if (bytes_received == -1)
+        {
+            this->listening_error_count++;
             continue;
+        }
 
         // Valid messages need to have the string terminator set
         message[bytes_received] = '\0';
@@ -145,7 +160,14 @@ int Server::listen()
         // Push the message into the queue
         this->message_queue.push(std::string(message));
 
-        // TODO if the address is not on the peer list, add it
+        // Check if the sender address is a new one
+        if (is_new_address(sender_address))
+        {
+            // Add the new address to peers
+            this->peer_addresses.push_back(sender_address);
+            
+            std::cout << "Novo Peer conectado!" << std::endl;
+        }
     }
 
     return 0;
@@ -211,6 +233,32 @@ int Server::send_message(std::string message, sockaddr_in destination_address)
         return -1;
 
     return 0;
+};
+
+/**
+ * Check if an address already exists on the peers
+ * @param new_address The address to be checked
+ * @returns Boolean indicating if it is new
+ */
+bool Server::is_new_address(sockaddr_in new_address)
+{
+    // Iterate through every peer address
+    for (int i = 0; i < this->peer_addresses.size(); i++)
+    {
+        // Get the current address
+        sockaddr_in current = this->peer_addresses.at(i);
+
+        // Check if the port and address are already present
+        if (current.sin_addr.s_addr == new_address.sin_addr.s_addr &&
+            current.sin_port == new_address.sin_port)
+            return false;
+    }
+
+    return true;
+};
+
+int Server::get_listening_error_count() {
+    return this->listening_error_count;
 };
 
 #endif

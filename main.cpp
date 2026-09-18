@@ -70,6 +70,10 @@ int main(int argc, char *argv[])
     // Join the thread upon ending
     listening_thread.join();
 
+    // Show the total listening errors
+    std::cout << "Total de erros de escuta: ";
+    std::cout << server.get_listening_error_count() << std::endl;
+
     // Show ending message
     std::cout << "Programa finalizado!" << std::endl;
     std::cout << std::endl;
