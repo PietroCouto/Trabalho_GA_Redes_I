@@ -62,8 +62,7 @@ int main(int argc, char *argv[])
     {
         if (server.has_message())
         {
-            std::cout << "Mensagem!" << std::endl;
-            server.get_message();
+            std::cout << server.get_message() << std::endl;
         }
     }
 
@@ -73,6 +72,10 @@ int main(int argc, char *argv[])
     // Show the total listening errors
     std::cout << "Total de erros de escuta: ";
     std::cout << server.get_listening_error_count() << std::endl;
+
+    // Show the total broadcasting errors
+    std::cout << "Total de erros de broadcast: ";
+    std::cout << server.get_broadcasting_error_count() << std::endl;
 
     // Show ending message
     std::cout << "Programa finalizado!" << std::endl;

@@ -40,6 +40,7 @@ public:
     bool has_message();
     std::string get_message();
     int get_listening_error_count();
+    int get_broadcasting_error_count();
 
 private:
     /**
@@ -50,11 +51,11 @@ private:
     int socket_fd;
     std::vector<sockaddr_in> peer_addresses;
     int listening_error_count;
+    int broadcasting_error_count;
+    std::mutex mtx;
 
     // TODO converter a queue em uma estrutura que armazene o endereço do remetente
     std::queue<std::string> message_queue;
-
-    // TODO adicionar mutex para a fila
 
     /**
      * Methods
@@ -75,6 +76,7 @@ Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> p
     this->peer_addresses = peer_addresses;
     this->socket_fd = -1;
     this->listening_error_count = 0;
+    this->broadcasting_error_count = 0;
 };
 
 /**
@@ -147,7 +149,6 @@ int Server::listen()
         bytes_received = recvfrom(this->socket_fd, message, sizeof(message) - 1, 0, (struct sockaddr *)&sender_address, &sender_address_size);
 
         // Check for errors
-        // TODO deal with errors
         if (bytes_received == -1)
         {
             this->listening_error_count++;
@@ -157,15 +158,21 @@ int Server::listen()
         // Valid messages need to have the string terminator set
         message[bytes_received] = '\0';
 
+        // Prevent racing condition on the queue
+        this->mtx.lock();
+
         // Push the message into the queue
         this->message_queue.push(std::string(message));
+
+        // Unlock the mutex
+        this->mtx.unlock();
 
         // Check if the sender address is a new one
         if (is_new_address(sender_address))
         {
             // Add the new address to peers
             this->peer_addresses.push_back(sender_address);
-            
+
             std::cout << "Novo Peer conectado!" << std::endl;
         }
     }
@@ -179,7 +186,15 @@ int Server::listen()
  */
 bool Server::has_message()
 {
-    return this->message_queue.size() != 0;
+    // Prevent racing condition on the queue
+    this->mtx.lock();
+
+    bool is_empty = this->message_queue.size() == 0;
+
+    // Unlock the mutex
+    this->mtx.unlock();
+
+    return !is_empty;
 }
 
 /**
@@ -191,11 +206,17 @@ std::string Server::get_message()
     // Check if there is a message on the queue
     if (this->has_message())
     {
+        // Prevent racing condition on the queue
+        this->mtx.lock();
+
         // Extract the message
         std::string message = message_queue.front();
 
         // Remove the message from the queue
         message_queue.pop();
+
+        // Unlock the mutex
+        this->mtx.unlock();
 
         return message;
     }
@@ -213,8 +234,8 @@ int Server::broadcast(std::string message)
     for (int i = 0; i < this->peer_addresses.size(); i++)
     {
         // Send the message to the current peer
-        // TODO deal with errors
-        sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&this->peer_addresses.at(i), sizeof(this->peer_addresses.at(i)));
+        if (sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&this->peer_addresses.at(i), sizeof(this->peer_addresses.at(i))) == -1)
+            this->broadcasting_error_count++;
     }
 
     return 0;
@@ -257,8 +278,22 @@ bool Server::is_new_address(sockaddr_in new_address)
     return true;
 };
 
-int Server::get_listening_error_count() {
+/**
+ * Get the total listening error amount
+ * @returns Integer for total errors
+ */
+int Server::get_listening_error_count()
+{
     return this->listening_error_count;
+};
+
+/**
+ * Get the total broadcasting error amount
+ * @returns Integer for total errors
+ */
+int Server::get_broadcasting_error_count()
+{
+    return this->broadcasting_error_count;
 };
 
 #endif
