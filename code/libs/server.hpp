@@ -50,6 +50,7 @@ public:
     package get_message();
     int get_listening_error_count();
     int get_broadcasting_error_count();
+    void show_errors();
 
 private:
     /**
@@ -304,5 +305,16 @@ int Server::get_broadcasting_error_count()
 {
     return this->broadcasting_error_count;
 };
+
+void Server::show_errors()
+{
+    // Show the total listening errors
+    std::cout << "Total de erros de escuta: ";
+    std::cout << this->listening_error_count << std::endl;
+
+    // Show the total broadcasting errors
+    std::cout << "Total de erros de broadcast: ";
+    std::cout << this->broadcasting_error_count << std::endl;
+}
 
 #endif
