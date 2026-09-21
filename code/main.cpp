@@ -13,6 +13,9 @@
 #include "./libs/utils.hpp"
 #include "./libs/config_handler/config_handler.cpp"
 #include "./libs/server.hpp"
+#include "./libs/filesystem_handler.hpp"
+
+void display_info(Server *server, FileSystemHandler *fs, int *broadcasting_errors, int *listening_errors);
 
 int main(int argc, char *argv[])
 {
@@ -45,10 +48,11 @@ int main(int argc, char *argv[])
     if (server.start() == -1)
         return -1;
 
-    std::cout << "Servidor inicializado!" << std::endl;
-    std::cout << std::endl;
+    int broadcasting_errors = -1;
+    int listening_errors = -1;
 
     // iniciar o filesystem
+    FileSystemHandler fs = FileSystemHandler();
 
     // fazer snapshot do filesystem
 
@@ -60,6 +64,8 @@ int main(int argc, char *argv[])
     // Main loop
     while (true)
     {
+        display_info(&server, &fs, &broadcasting_errors, &listening_errors);
+
         if (server.has_message())
         {
             std::cout << server.get_message().message << std::endl;
@@ -69,17 +75,26 @@ int main(int argc, char *argv[])
     // Join the thread upon ending
     listening_thread.join();
 
-    // Show the total listening errors
-    std::cout << "Total de erros de escuta: ";
-    std::cout << server.get_listening_error_count() << std::endl;
-
-    // Show the total broadcasting errors
-    std::cout << "Total de erros de broadcast: ";
-    std::cout << server.get_broadcasting_error_count() << std::endl;
-
     // Show ending message
     std::cout << "Programa finalizado!" << std::endl;
     std::cout << std::endl;
 
     return 0;
+}
+
+void display_info(Server *server, FileSystemHandler *fs, int *broadcasting_errors, int *listening_errors)
+{
+    if (server->get_broadcasting_error_count() == *broadcasting_errors && server->get_listening_error_count() == *listening_errors)
+        return;
+
+    *broadcasting_errors = server->get_broadcasting_error_count();
+    *listening_errors = server->get_listening_error_count();
+
+    clear_screen();
+
+    server->show_errors();
+
+    std::cout << std::endl;
+
+    fs->show_files();
 }
