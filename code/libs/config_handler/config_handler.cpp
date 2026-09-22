@@ -13,15 +13,12 @@
  */
 int config_handler(sockaddr_in *machine_address, std::vector<sockaddr_in> *peer_addresses, std::string machine_name)
 {
-    // Get the config file path from the user
-    std::string path = get_path();
-
     clear_screen();
 
     std::ifstream *config_file;
 
     // Try to open the file
-    if (get_file(path, &config_file) == -1)
+    if (get_file(&config_file) == -1)
         return error_message("Não foi possível abrir o arquivo de configuração!");
 
     // Try to extract the config from the file
@@ -36,14 +33,13 @@ int config_handler(sockaddr_in *machine_address, std::vector<sockaddr_in> *peer_
 
 /**
  * Opens a file provided by the user
- * @param path The path of the file
  * @param config_file The address of the ifstream pointer
  * @returns -1 for error, 0 for success
  */
-int get_file(std::string path, std::ifstream **config_file)
+int get_file(std::ifstream **config_file)
 {
     // Try to open the provided file path
-    *config_file = new std::ifstream(path.c_str(), std::ios::in);
+    *config_file = new std::ifstream(std::string(CONFIG_PATH).c_str(), std::ios::in);
 
     // Check if the file has been successfully openned
     if (!(*config_file)->is_open())
@@ -98,23 +94,6 @@ int find_config_on_file(std::ifstream **config_file, sockaddr_in *machine_addres
 
     return 0;
 };
-
-/**
- * Ask the file path to the user
- * @returns The string path
- */
-std::string get_path()
-{
-    std::string path;
-
-    // Ask for the file path
-    std::cout << "Digite o path do arquivo de configuração: ";
-
-    // Get the input from the user
-    std::cin >> path;
-
-    return path;
-}
 
 /**
  * Reads the config block containing the machine info
