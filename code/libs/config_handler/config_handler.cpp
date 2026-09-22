@@ -31,224 +31,227 @@ int config_handler(sockaddr_in *machine_address, std::vector<sockaddr_in> *peer_
     return 0;
 };
 
-/**
- * Opens a file provided by the user
- * @param config_file The address of the ifstream pointer
- * @returns -1 for error, 0 for success
- */
-int get_file(std::ifstream **config_file)
+namespace
 {
-    // Try to open the provided file path
-    *config_file = new std::ifstream(std::string(CONFIG_PATH).c_str(), std::ios::in);
-
-    // Check if the file has been successfully openned
-    if (!(*config_file)->is_open())
-        return -1;
-
-    return 0;
-};
-
-/**
- * Read the file in search of the provided machine name and peers
- * @param config_file Pointer to the config file ifstream
- * @param machine_address Pointer to the machine address structure
- * @param peer_addresses Pointer to the peer address structure
- * @param machine_name The name of the machine being spun up
- * @returns -1 for error, 0 for success
- */
-int find_config_on_file(std::ifstream **config_file, sockaddr_in *machine_address, std::vector<sockaddr_in> *peer_addresses, std::string machine_name)
-{
-    std::string line;
-
-    // Check if the file has error
-    if (!(*config_file)->good())
-        return -1;
-
-    // Read the entire file
-    while (true)
+    /**
+     * Opens a file provided by the user
+     * @param config_file The address of the ifstream pointer
+     * @returns -1 for error, 0 for success
+     */
+    int get_file(std::ifstream **config_file)
     {
-        // Try to read the next line
-        if (!std::getline(**config_file, line) && !(*config_file)->eof())
+        // Try to open the provided file path
+        *config_file = new std::ifstream(std::string(CONFIG_PATH).c_str(), std::ios::in);
+
+        // Check if the file has been successfully openned
+        if (!(*config_file)->is_open())
             return -1;
 
-        bool is_current_machine = line.find(machine_name) != std::string::npos;
+        return 0;
+    };
 
-        // Check if this machine config has been found and try to extract it
-        if (is_current_machine && get_machine_config(config_file, machine_address) == -1)
+    /**
+     * Read the file in search of the provided machine name and peers
+     * @param config_file Pointer to the config file ifstream
+     * @param machine_address Pointer to the machine address structure
+     * @param peer_addresses Pointer to the peer address structure
+     * @param machine_name The name of the machine being spun up
+     * @returns -1 for error, 0 for success
+     */
+    int find_config_on_file(std::ifstream **config_file, sockaddr_in *machine_address, std::vector<sockaddr_in> *peer_addresses, std::string machine_name)
+    {
+        std::string line;
+
+        // Check if the file has error
+        if (!(*config_file)->good())
             return -1;
 
-        // If it is a peer config and try to extract it
-        if (line.find("MACHINE") != std::string::npos && !is_current_machine && get_peer_config(config_file, peer_addresses) == -1)
-            return -1;
+        // Read the entire file
+        while (true)
+        {
+            // Try to read the next line
+            if (!std::getline(**config_file, line) && !(*config_file)->eof())
+                return -1;
 
-        // Check if the file has ended
-        if ((*config_file)->eof())
-            break;
+            bool is_current_machine = line.find(machine_name) != std::string::npos;
+
+            // Check if this machine config has been found and try to extract it
+            if (is_current_machine && get_machine_config(config_file, machine_address) == -1)
+                return -1;
+
+            // If it is a peer config and try to extract it
+            if (line.find("MACHINE") != std::string::npos && !is_current_machine && get_peer_config(config_file, peer_addresses) == -1)
+                return -1;
+
+            // Check if the file has ended
+            if ((*config_file)->eof())
+                break;
+        }
+
+        // Close the config file
+        (*config_file)->close();
+
+        // Free the memory pointer
+        delete *config_file;
+
+        return 0;
+    };
+
+    /**
+     * Reads the config block containing the machine info
+     * @param config_file Pointer to the open file
+     * @param machine_address Pointer to the machine address structure
+     * @returns -1 for error, 0 for success
+     */
+    int get_machine_config(std::ifstream **config_file, sockaddr_in *machine_address)
+    {
+        std::string line;
+
+        machine_address->sin_family = AF_INET;
+
+        // Read the entire block
+        while (true)
+        {
+            // Try to read the next line
+            if (!std::getline(**config_file, line) && !(*config_file)->eof())
+                return -1;
+
+            // Try to get the address
+            if (line.find("ADDRESS") != std::string::npos && get_address(line, machine_address) == -1)
+                return error_message("Erro ao obter o endereço do Peer!");
+
+            // Try to get the port
+            if (line.find("PORT") != std::string::npos && get_port(line, machine_address) == -1)
+                return error_message("Erro ao obter a porta do Peer!");
+
+            // Check for the blank line that separates config blocks or EOF
+            if (line.compare("") == 0 || (*config_file)->eof())
+                return 0;
+        }
+
+        return 0;
     }
 
-    // Close the config file
-    (*config_file)->close();
-
-    // Free the memory pointer
-    delete *config_file;
-
-    return 0;
-};
-
-/**
- * Reads the config block containing the machine info
- * @param config_file Pointer to the open file
- * @param machine_address Pointer to the machine address structure
- * @returns -1 for error, 0 for success
- */
-int get_machine_config(std::ifstream **config_file, sockaddr_in *machine_address)
-{
-    std::string line;
-
-    machine_address->sin_family = AF_INET;
-
-    // Read the entire block
-    while (true)
+    /**
+     * Reads the config block containing a peer machine info
+     * @param config_file Pointer to the open file
+     * @param peer_addresses Pointer to the peer addresses structure
+     * @returns -1 for error, 0 for success
+     */
+    int get_peer_config(std::ifstream **config_file, std::vector<sockaddr_in> *peer_addresses)
     {
-        // Try to read the next line
-        if (!std::getline(**config_file, line) && !(*config_file)->eof())
+        std::string line;
+
+        // Define a new address structure
+        sockaddr_in peer_address;
+
+        // Empty the memory structure
+        memset(&peer_address, 0, sizeof(sockaddr_in));
+
+        // Define the sin_family
+        peer_address.sin_family = AF_INET;
+
+        // Read the entire block
+        while (true)
+        {
+            // Attempts to read the next line
+            if (!std::getline(**config_file, line) && !(*config_file)->eof())
+                return -1;
+
+            // Try to get the address
+            if (line.find("ADDRESS") != std::string::npos && get_address(line, &peer_address) == -1)
+                return error_message("Erro ao obter o endereço do Peer!");
+
+            // Try to get the port
+            if (line.find("PORT") != std::string::npos && get_port(line, &peer_address) == -1)
+                return error_message("Erro ao obter a porta do Peer!");
+
+            // Check for the blank line that separates configs or EOF
+            if (line.compare("") == 0 || (*config_file)->eof())
+                break;
+        }
+
+        // Push the address into the vector
+        peer_addresses->push_back(peer_address);
+
+        return 0;
+    };
+
+    /**
+     * Extract the port from the file line
+     * @param line Line to extract from
+     * @param address Address struct to save the port to
+     * @returns -1 for error, 0 for success
+     */
+    int get_port(std::string line, sockaddr_in *address)
+    {
+        // Validate the length of the port
+        if (line.length() <= 5 || line.length() > 10)
             return -1;
 
-        // Try to get the address
-        if (line.find("ADDRESS") != std::string::npos && get_address(line, machine_address) == -1)
-            return error_message("Erro ao obter o endereço do Peer!");
+        // Extract the substring
+        std::string port_substring = line.substr(5);
 
-        // Try to get the port
-        if (line.find("PORT") != std::string::npos && get_port(line, machine_address) == -1)
-            return error_message("Erro ao obter a porta do Peer!");
+        // String to int
+        int port = std::stoi(line.substr(5));
 
-        // Check for the blank line that separates config blocks or EOF
-        if (line.compare("") == 0 || (*config_file)->eof())
-            return 0;
+        // Int to NS
+        address->sin_port = htons(port);
+
+        return 0;
     }
 
-    return 0;
-}
-
-/**
- * Reads the config block containing a peer machine info
- * @param config_file Pointer to the open file
- * @param peer_addresses Pointer to the peer addresses structure
- * @returns -1 for error, 0 for success
- */
-int get_peer_config(std::ifstream **config_file, std::vector<sockaddr_in> *peer_addresses)
-{
-    std::string line;
-
-    // Define a new address structure
-    sockaddr_in peer_address;
-
-    // Empty the memory structure
-    memset(&peer_address, 0, sizeof(sockaddr_in));
-
-    // Define the sin_family
-    peer_address.sin_family = AF_INET;
-
-    // Read the entire block
-    while (true)
+    /**
+     * Extract the address from the file line
+     * @param line Line to extract from
+     * @param address Address struct to save the address to
+     * @returns -1 for error, 0 for success
+     */
+    int get_address(std::string line, sockaddr_in *address)
     {
-        // Attempts to read the next line
-        if (!std::getline(**config_file, line) && !(*config_file)->eof())
+        // Validate the length of the port
+        if (line.length() <= 15 || line.length() > 23)
             return -1;
 
-        // Try to get the address
-        if (line.find("ADDRESS") != std::string::npos && get_address(line, &peer_address) == -1)
-            return error_message("Erro ao obter o endereço do Peer!");
+        // Int to NS
+        inet_pton(AF_INET, line.substr(8).c_str(), &address->sin_addr);
 
-        // Try to get the port
-        if (line.find("PORT") != std::string::npos && get_port(line, &peer_address) == -1)
-            return error_message("Erro ao obter a porta do Peer!");
-
-        // Check for the blank line that separates configs or EOF
-        if (line.compare("") == 0 || (*config_file)->eof())
-            break;
+        return 0;
     }
 
-    // Push the address into the vector
-    peer_addresses->push_back(peer_address);
-
-    return 0;
-};
-
-/**
- * Extract the port from the file line
- * @param line Line to extract from
- * @param address Address struct to save the port to
- * @returns -1 for error, 0 for success
- */
-int get_port(std::string line, sockaddr_in *address)
-{
-    // Validate the length of the port
-    if (line.length() <= 5 || line.length() > 10)
-        return -1;
-
-    // Extract the substring
-    std::string port_substring = line.substr(5);
-
-    // String to int
-    int port = std::stoi(line.substr(5));
-
-    // Int to NS
-    address->sin_port = htons(port);
-
-    return 0;
-}
-
-/**
- * Extract the address from the file line
- * @param line Line to extract from
- * @param address Address struct to save the address to
- * @returns -1 for error, 0 for success
- */
-int get_address(std::string line, sockaddr_in *address)
-{
-    // Validate the length of the port
-    if (line.length() <= 15 || line.length() > 23)
-        return -1;
-
-    // Int to NS
-    inet_pton(AF_INET, line.substr(8).c_str(), &address->sin_addr);
-
-    return 0;
-}
-
-/**
- * Display the extracted machine and peer configs
- * @param machine_address Pointer to the machine address structure
- * @param peer_addresses Pointer to the peer address structure
- * @param machine_name The name of the machine being spun up
- */
-void display_extracted_configs(sockaddr_in *machine_address, std::vector<sockaddr_in> *peer_addresses, std::string machine_name)
-{
-    char address[17];
-
-    inet_ntop(AF_INET, &machine_address->sin_addr, address, sizeof(address));
-
-    std::cout << "-- DADOS EXTRAÍDOS --" << std::endl;
-
-    std::cout << std::endl;
-
-    std::cout << "------ MÁQUINA ------" << std::endl;
-    std::cout << "Nome: " << machine_name << std::endl;
-    std::cout << "Endereço: " << address << std::endl;
-    std::cout << "Porta: " << ntohs(machine_address->sin_port) << std::endl;
-
-    std::cout << std::endl;
-
-    std::cout << "------- PEERS -------" << std::endl;
-
-    for (int i = 0; i < peer_addresses->size(); i++)
+    /**
+     * Display the extracted machine and peer configs
+     * @param machine_address Pointer to the machine address structure
+     * @param peer_addresses Pointer to the peer address structure
+     * @param machine_name The name of the machine being spun up
+     */
+    void display_extracted_configs(sockaddr_in *machine_address, std::vector<sockaddr_in> *peer_addresses, std::string machine_name)
     {
-        inet_ntop(AF_INET, &peer_addresses->at(i).sin_addr, address, sizeof(address));
+        char address[17];
 
-        std::cout << "Endereço: " << address << std::endl;
-        std::cout << "Porta: " << ntohs(peer_addresses->at(i).sin_port) << std::endl;
+        inet_ntop(AF_INET, &machine_address->sin_addr, address, sizeof(address));
+
+        std::cout << "-- DADOS EXTRAÍDOS --" << std::endl;
 
         std::cout << std::endl;
-    }
-};
+
+        std::cout << "------ MÁQUINA ------" << std::endl;
+        std::cout << "Nome: " << machine_name << std::endl;
+        std::cout << "Endereço: " << address << std::endl;
+        std::cout << "Porta: " << ntohs(machine_address->sin_port) << std::endl;
+
+        std::cout << std::endl;
+
+        std::cout << "------- PEERS -------" << std::endl;
+
+        for (int i = 0; i < peer_addresses->size(); i++)
+        {
+            inet_ntop(AF_INET, &peer_addresses->at(i).sin_addr, address, sizeof(address));
+
+            std::cout << "Endereço: " << address << std::endl;
+            std::cout << "Porta: " << ntohs(peer_addresses->at(i).sin_port) << std::endl;
+
+            std::cout << std::endl;
+        }
+    };
+}
