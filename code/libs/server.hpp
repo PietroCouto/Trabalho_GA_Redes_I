@@ -169,13 +169,10 @@ int Server::listen()
         message[bytes_received] = '\0';
 
         // Prevent racing condition on the queue
-        this->mtx.lock();
+        std::lock_guard<std::mutex> lock(this->mtx);
 
         // Push the message into the queue
         this->message_queue.push(package{std::string(message), sender_address});
-
-        // Unlock the mutex
-        this->mtx.unlock();
 
         // Check if the sender address is a new one
         if (is_new_address(sender_address))
@@ -197,12 +194,9 @@ int Server::listen()
 bool Server::has_message()
 {
     // Prevent racing condition on the queue
-    this->mtx.lock();
+    std::lock_guard<std::mutex> lock(this->mtx);
 
     bool is_empty = this->message_queue.size() == 0;
-
-    // Unlock the mutex
-    this->mtx.unlock();
 
     return !is_empty;
 }
@@ -213,25 +207,20 @@ bool Server::has_message()
  */
 package Server::get_message()
 {
+    // Prevent racing condition on the queue
+    std::lock_guard<std::mutex> lock(this->mtx);
+
     // Check if there is a message on the queue
-    if (this->has_message())
-    {
-        // Prevent racing condition on the queue
-        this->mtx.lock();
+    if (this->message_queue.empty())
+        return package{};
 
-        // Extract the message
-        package message = message_queue.front();
+    // Extract the message
+    package message = message_queue.front();
 
-        // Remove the message from the queue
-        message_queue.pop();
+    // Remove the message from the queue
+    message_queue.pop();
 
-        // Unlock the mutex
-        this->mtx.unlock();
-
-        return message;
-    }
-
-    return package{};
+    return message;
 }
 
 /**
@@ -240,6 +229,8 @@ package Server::get_message()
  */
 int Server::broadcast(std::string message)
 {
+    std::lock_guard<std::mutex> lock(this->mtx);
+
     // Iterate every peer
     for (int i = 0; i < this->peer_addresses.size(); i++)
     {
@@ -308,6 +299,8 @@ int Server::get_broadcasting_error_count()
 
 void Server::show_errors()
 {
+    std::cout << "---- ERROS ----" << std::endl;
+
     // Show the total listening errors
     std::cout << "Total de erros de escuta: ";
     std::cout << this->listening_error_count << std::endl;
