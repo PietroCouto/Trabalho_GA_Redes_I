@@ -11,11 +11,15 @@
 #include <sys/socket.h>
 #include <queue>
 #include <unistd.h>
+#include <chrono>
+#include <condition_variable>
 
 /**
  * Handmade libs
  */
 #include "./utils.hpp"
+
+#define MAX_ATTEMPTS 5
 
 struct package
 {
@@ -63,6 +67,9 @@ private:
     int listening_error_count;
     int broadcasting_error_count;
     std::mutex mtx;
+    std::mutex reply_mtx;
+    std::condition_variable reply_cv;
+    package reply;
 
     // TODO converter a queue em uma estrutura que armazene o endereço do remetente
     std::queue<package> message_queue;
@@ -87,6 +94,7 @@ Server::Server(std::string name, sockaddr_in address, std::vector<sockaddr_in> p
     this->socket_fd = -1;
     this->listening_error_count = 0;
     this->broadcasting_error_count = 0;
+    this->reply = package();
 };
 
 /**
@@ -168,20 +176,38 @@ int Server::listen()
         // Valid messages need to have the string terminator set
         message[bytes_received] = '\0';
 
+        std::string message_string = std::string(message);
+
+        std::cout << message_string << std::endl;
+
+        // Check if is just a confirmation message
+        if (message_string.find("OK") != std::string::npos)
+        {
+            // Lock the reply mutex
+            std::lock_guard<std::mutex> lock(this->reply_mtx);
+
+            // Save the message and the sender
+            this->reply = {message_string, sender_address};
+
+            // Notify the thread waiting for the response
+            this->reply_cv.notify_all();
+
+            // Skip the queueing
+            continue;
+        }
+
+        // Inform that the message was received
+        sendto(this->socket_fd, "OK", 2, 0, (struct sockaddr *)&sender_address, sizeof(sender_address));
+
         // Prevent racing condition on the queue
         std::lock_guard<std::mutex> lock(this->mtx);
 
         // Push the message into the queue
-        this->message_queue.push(package{std::string(message), sender_address});
+        this->message_queue.push(package{message_string, sender_address});
 
-        // Check if the sender address is a new one
+        // Check if the sender address is a new peer
         if (is_new_address(sender_address))
-        {
-            // Add the new address to peers
             this->peer_addresses.push_back(sender_address);
-
-            std::cout << "Novo Peer conectado!" << std::endl;
-        }
     }
 
     return 0;
@@ -229,13 +255,18 @@ package Server::get_message()
  */
 int Server::broadcast(std::string message)
 {
-    std::lock_guard<std::mutex> lock(this->mtx);
+    std::vector<sockaddr_in> peers_copy;
+
+    {
+        std::lock_guard<std::mutex> lock(this->mtx);
+        peers_copy = this->peer_addresses;
+    }
 
     // Iterate every peer
-    for (int i = 0; i < this->peer_addresses.size(); i++)
+    for (int i = 0; i < peers_copy.size(); i++)
     {
         // Send the message to the current peer
-        if (sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&this->peer_addresses.at(i), sizeof(this->peer_addresses.at(i))) == -1)
+        if (this->send_message(message, peers_copy.at(i)) == -1)
             this->broadcasting_error_count++;
     }
 
@@ -250,11 +281,32 @@ int Server::broadcast(std::string message)
  */
 int Server::send_message(std::string message, sockaddr_in destination_address)
 {
-    // Try to send the message to the destination
-    if (sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&destination_address, sizeof(destination_address)) == -1)
-        return -1;
+    int attempts = 0;
 
-    return 0;
+    // Try to send the message for MAX_ATTEMPTS
+    while (attempts < MAX_ATTEMPTS)
+    {
+        // Try to send the message to the destination
+        if (sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&destination_address, sizeof(destination_address)) == -1)
+            return -1;
+
+        std::unique_lock<std::mutex> lock(this->reply_mtx);
+
+        bool received = this->reply_cv.wait_for(lock, std::chrono::seconds(1), [this, &destination_address]()
+                                                { return (this->reply.message.find("OK") != std::string::npos &&
+                                                          this->reply.sender_address.sin_addr.s_addr == destination_address.sin_addr.s_addr &&
+                                                          this->reply.sender_address.sin_port == destination_address.sin_port); });
+
+        if (received)
+        {
+            this->reply = {};
+            return 0;
+        }
+
+        attempts++;
+    }
+
+    return -1;
 };
 
 /**
@@ -297,6 +349,9 @@ int Server::get_broadcasting_error_count()
     return this->broadcasting_error_count;
 };
 
+/**
+ * Displays server errors
+ */
 void Server::show_errors()
 {
     std::cout << "---- ERROS ----" << std::endl;
