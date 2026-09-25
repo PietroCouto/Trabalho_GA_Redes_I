@@ -58,6 +58,8 @@ int main(int argc, char *argv[])
     std::thread listening_thread(&Server::listen, &server);
     std::thread watcher_thread(&FileSystemHandler::watch_dir, &fs);
 
+    // TODO pedir lista de arquivos para os outros peers
+
     // Main loop
     while (true)
     {
@@ -67,6 +69,8 @@ int main(int argc, char *argv[])
         if (server.has_message())
         {
             package packet = server.get_message();
+
+            std::cout << packet.message << std::endl;
 
             // Check if a peer is anouncing a file
             if (packet.message.find("ANUNCIO") != std::string::npos) {
@@ -83,7 +87,11 @@ int main(int argc, char *argv[])
             if (packet.message.find("REMOVIDO") != std::string::npos) {}
 
             // Check if a peer has asked for the directory list
-            if (packet.message.find("LISTA") != std::string::npos) {}
+            if (packet.message.find("LISTA") != std::string::npos) {
+                std::string file_list = fs.get_file_list();
+
+                server.send_message(file_list, packet.sender_address);
+            }
         }
 
         // Check if it has a local change

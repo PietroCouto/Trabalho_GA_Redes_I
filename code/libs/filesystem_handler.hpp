@@ -31,6 +31,8 @@ public:
     bool has_events();
     std::string get_event();
     void stop_watch();
+    std::string get_file_list();
+    int remove_file(std::string file);
 
 private:
     std::queue<std::string> event_queue;
@@ -148,13 +150,15 @@ int FileSystemHandler::watch_dir()
     return 0;
 }
 
-bool FileSystemHandler::has_events() {
+bool FileSystemHandler::has_events()
+{
     std::lock_guard<std::mutex> lock(this->mtx);
 
     return this->event_queue.size() != 0;
 };
 
-std::string FileSystemHandler::get_event() {
+std::string FileSystemHandler::get_event()
+{
     std::lock_guard<std::mutex> lock(this->mtx);
 
     if (this->event_queue.size() == 0)
@@ -162,13 +166,30 @@ std::string FileSystemHandler::get_event() {
 
     std::string event = this->event_queue.front();
 
-     this->event_queue.pop();
+    this->event_queue.pop();
 
     return event;
 };
 
-void FileSystemHandler::stop_watch() {
+void FileSystemHandler::stop_watch()
+{
     this->running = false;
 }
+
+std::string FileSystemHandler::get_file_list() {
+    std::string file_list;
+
+    for (const auto &entry :
+         std::filesystem::directory_iterator(PATH))
+    {
+        file_list.append(std::string(entry.path()).append("\n"));
+    }
+
+    return file_list;
+};
+
+int FileSystemHandler::remove_file(std::string file) {
+    return 0;
+};
 
 #endif
