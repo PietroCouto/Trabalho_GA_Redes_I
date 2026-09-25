@@ -51,29 +51,61 @@ int main(int argc, char *argv[])
     int broadcasting_errors = -1;
     int listening_errors = -1;
 
-    // iniciar o filesystem
+    // Start the filesystem handler
     FileSystemHandler fs = FileSystemHandler();
-
-    // fazer snapshot do filesystem
 
     // Start the listening thread
     std::thread listening_thread(&Server::listen, &server);
-
-    server.broadcast("teste");
+    std::thread watcher_thread(&FileSystemHandler::watch_dir, &fs);
 
     // Main loop
     while (true)
     {
         display_info(&server, &fs, &broadcasting_errors, &listening_errors);
 
+        // Check if peers have sent a message
         if (server.has_message())
         {
-            std::cout << server.get_message().message << std::endl;
+            package packet = server.get_message();
+
+            // Check if a peer is anouncing a file
+            if (packet.message.find("ANUNCIO") != std::string::npos) {
+                
+            }
+
+            // Check if a peer is asking for a file
+            if (packet.message.find("PEDIR") != std::string::npos) {}
+
+            // Check if a peer is sending a file piece
+            if (packet.message.find("DADOS") != std::string::npos) {}
+
+            // Check if a peer has removed a file
+            if (packet.message.find("REMOVIDO") != std::string::npos) {}
+
+            // Check if a peer has asked for the directory list
+            if (packet.message.find("LISTA") != std::string::npos) {}
+        }
+
+        // Check if it has a local change
+        if (fs.has_events())
+        {
+            std::string event = fs.get_event();
+
+            /**
+             * Lembre-se de que o UDP não garante a entrega: datagramas podem se perder, chegar fora
+             * de ordem ou duplicados. O seu programa precisa tolerar isso na própria aplicação, por
+             * exemplo reenviando um anúncio até ter certeza de que os outros peers o receberam, ou
+             * pedindo de novo um pedaço de arquivo que não chegou.
+             */
+
+            // Share the changes
+            server.broadcast(event);
         }
     }
 
-    // Join the thread upon ending
+    // Join the threads upon ending
     listening_thread.join();
+    watcher_thread.join();
 
     // Show ending message
     std::cout << "Programa finalizado!" << std::endl;
@@ -82,19 +114,32 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+/**
+ * Displays current system information
+ * @param server Pointer to the Server instance
+ * @param fs Pointer to the FileSystemHandler instance
+ * @param broadcasting_errors Pointer to the variable storing the broadcasting errors
+ * @param listening_errors Pointer to the variable storing the listening errors
+ */
 void display_info(Server *server, FileSystemHandler *fs, int *broadcasting_errors, int *listening_errors)
 {
+    // Check if the error count has changed
     if (server->get_broadcasting_error_count() == *broadcasting_errors && server->get_listening_error_count() == *listening_errors)
         return;
 
+    // Update error count
     *broadcasting_errors = server->get_broadcasting_error_count();
     *listening_errors = server->get_listening_error_count();
 
     clear_screen();
 
+    // Display server errors
     server->show_errors();
 
     std::cout << std::endl;
 
+    // Display server files
     fs->show_files();
+
+    std::cout << std::endl;
 }
