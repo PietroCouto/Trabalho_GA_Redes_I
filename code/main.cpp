@@ -72,7 +72,6 @@ int main(int argc, char *argv[])
 
     // TODO pedir lista de arquivos para os outros peers
 
-    server.broadcast("PEDIR test.txt");
 
     // Main loop
     while (true)

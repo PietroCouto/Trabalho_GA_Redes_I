@@ -71,7 +71,6 @@ private:
     std::condition_variable reply_cv;
     package reply;
 
-    // TODO converter a queue em uma estrutura que armazene o endereço do remetente
     std::queue<package> message_queue;
 
     /**
