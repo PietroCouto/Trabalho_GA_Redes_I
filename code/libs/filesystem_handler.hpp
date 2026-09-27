@@ -30,14 +30,14 @@ public:
     int watch_dir();
     bool has_events();
     std::string get_event();
-    void stop_watch();
     std::string get_file_list();
     int remove_file(std::string file);
 
 private:
     std::queue<std::string> event_queue;
     std::mutex mtx;
-    std::atomic<bool> running;
+    std::mutex ignore_file_mutex;
+    std::string ignore_file;
 };
 
 /**
@@ -51,7 +51,7 @@ FileSystemHandler::FileSystemHandler()
 
     // Create a new event queue
     this->event_queue = std::queue<std::string>();
-    this->running = false;
+    this->ignore_file = "";
 }
 
 /**
@@ -94,10 +94,8 @@ int FileSystemHandler::watch_dir()
 
     char buffer[BUF_LEN];
 
-    this->running = true;
-
     // Watcher loop
-    while (this->running)
+    while (true)
     {
         ssize_t length = read(fd, buffer, BUF_LEN);
 
@@ -110,8 +108,16 @@ int FileSystemHandler::watch_dir()
         {
             auto *event = reinterpret_cast<struct inotify_event *>(&buffer[i]);
 
-            // Check if an event was recieved
-            if (event->len > 0)
+            std::string ignore;
+
+            // Get the ignore file safely
+            {
+                std::lock_guard<std::mutex> lock(ignore_file_mutex);
+                ignore = this->ignore_file;
+            }
+
+            // Check if an event was recieved and should not be ignored
+            if (event->len > 0 && (ignore == "" || std::string(event->name).find(ignore) == std::string::npos))
             {
                 // Check if it was a creation event
                 if ((event->mask & IN_CREATE) || (event->mask & IN_MOVED_TO))
@@ -150,6 +156,10 @@ int FileSystemHandler::watch_dir()
     return 0;
 }
 
+/**
+ * Check if there is a new event
+ * @returns Boolean
+ */
 bool FileSystemHandler::has_events()
 {
     std::lock_guard<std::mutex> lock(this->mtx);
@@ -157,26 +167,34 @@ bool FileSystemHandler::has_events()
     return this->event_queue.size() != 0;
 };
 
+/**
+ * Get the next event on the queue
+ * @returns String representing the event
+ */
 std::string FileSystemHandler::get_event()
 {
+    // Lock the queue to prevent race conditions
     std::lock_guard<std::mutex> lock(this->mtx);
 
+    // Check if the queue is empty
     if (this->event_queue.size() == 0)
         return "";
 
+    // Get the next event
     std::string event = this->event_queue.front();
 
+    // Remove it from the queue
     this->event_queue.pop();
 
     return event;
 };
 
-void FileSystemHandler::stop_watch()
+/**
+ * Get the list of files on the PATH directory
+ * @returns String list of files
+ */
+std::string FileSystemHandler::get_file_list()
 {
-    this->running = false;
-}
-
-std::string FileSystemHandler::get_file_list() {
     std::string file_list;
 
     for (const auto &entry :
@@ -188,7 +206,27 @@ std::string FileSystemHandler::get_file_list() {
     return file_list;
 };
 
-int FileSystemHandler::remove_file(std::string file) {
+/**
+ * Removes a file from the PATH directory
+ * @param file The file to be removed
+ */
+int FileSystemHandler::remove_file(std::string file)
+{
+    // Ignore the change
+    {
+        std::lock_guard<std::mutex> lock(this->ignore_file_mutex);
+        this->ignore_file = file;
+    }
+
+    // Remove the file
+    std::filesystem::remove(std::filesystem::path(PATH) / file);
+
+    // Reset the ignore
+    {
+        std::lock_guard<std::mutex> lock(this->ignore_file_mutex);
+        this->ignore_file = "";
+    }
+
     return 0;
 };
 

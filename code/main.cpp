@@ -73,23 +73,31 @@ int main(int argc, char *argv[])
             std::cout << packet.message << std::endl;
 
             // Check if a peer is anouncing a file
-            if (packet.message.find("ANUNCIO") != std::string::npos) {
-                
+            if (packet.message.find("ANUNCIO") != std::string::npos)
+            {
             }
 
             // Check if a peer is asking for a file
-            if (packet.message.find("PEDIR") != std::string::npos) {}
+            if (packet.message.find("PEDIR") != std::string::npos)
+            {
+            }
 
             // Check if a peer is sending a file piece
-            if (packet.message.find("DADOS") != std::string::npos) {}
+            if (packet.message.find("DADOS") != std::string::npos)
+            {
+            }
 
             // Check if a peer has removed a file
-            if (packet.message.find("REMOVIDO") != std::string::npos) {}
+            if (packet.message.find("REMOVIDO") != std::string::npos)
+                fs.remove_file(packet.message.substr(9));
 
             // Check if a peer has asked for the directory list
-            if (packet.message.find("LISTA") != std::string::npos) {
+            if (packet.message.find("LISTA") != std::string::npos)
+            {
+                // Get the directory file list
                 std::string file_list = fs.get_file_list();
 
+                // Send the list
                 server.send_message(file_list, packet.sender_address);
             }
         }
@@ -98,13 +106,6 @@ int main(int argc, char *argv[])
         if (fs.has_events())
         {
             std::string event = fs.get_event();
-
-            /**
-             * Lembre-se de que o UDP não garante a entrega: datagramas podem se perder, chegar fora
-             * de ordem ou duplicados. O seu programa precisa tolerar isso na própria aplicação, por
-             * exemplo reenviando um anúncio até ter certeza de que os outros peers o receberam, ou
-             * pedindo de novo um pedaço de arquivo que não chegou.
-             */
 
             // Share the changes
             server.broadcast(event);
