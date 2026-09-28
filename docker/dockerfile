@@ -1,0 +1,11 @@
+FROM gcc:12
+
+WORKDIR /app
+
+COPY .. .
+
+RUN mkdir -p /app/tmp
+
+RUN g++ -std=c++17 -pthread code/main.cpp -o server_app
+
+CMD ["./server_app"]

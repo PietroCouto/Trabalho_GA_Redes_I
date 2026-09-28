@@ -31,12 +31,23 @@ void share_events(Server *server, FileSystemHandler *fs);
  */
 int main(int argc, char *argv[])
 {
+    std::string machine_name;
+
+
+    // Check if the machine name was provided as a parameter
+    if (argc == 2)
+        machine_name = std::string(argv[1]);
+    
+    // Try to get the machine name from docker env
+    else
+        machine_name = std::getenv("CONTAINER_NAME");
+
     // Validate that the machine name has been provided
-    if (argc == 1)
+    if (machine_name.size() == 0)
         return error_message("O nome da máquina deve ser fornecido!");
 
     // Display startup message
-    show_startup_message(argv[1]);
+    show_startup_message(machine_name);
 
     // Variables to store the machine and peers addresses
     sockaddr_in machine_address;
@@ -46,7 +57,7 @@ int main(int argc, char *argv[])
     memset(&machine_address, 0, sizeof(sockaddr_in));
 
     // Try to open and read a provided config file
-    if (config_handler(&machine_address, &peer_addresses, argv[1]) == -1)
+    if (config_handler(&machine_address, &peer_addresses, machine_name) == -1)
         return -1;
 
     // Check if the machine has been found on the file
@@ -54,7 +65,7 @@ int main(int argc, char *argv[])
         return error_message("Máquina não encontrada no arquivo de configuração!");
 
     // Create the server object
-    Server server(argv[1], machine_address, peer_addresses);
+    Server server(machine_name, machine_address, peer_addresses);
 
     // Try to start the server
     if (server.start() == -1)
@@ -71,7 +82,6 @@ int main(int argc, char *argv[])
     std::thread watcher_thread(&FileSystemHandler::watch_dir, &fs);
 
     // TODO pedir lista de arquivos para os outros peers
-
 
     // Main loop
     while (true)
@@ -214,7 +224,7 @@ void request_file(package packet, Server *server, FileSystemHandler *fs)
 }
 
 /**
- * 
+ *
  */
 void save_to_buffer(std::string message, FileSystemHandler *fs)
 {
