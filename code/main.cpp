@@ -25,6 +25,7 @@ void send_file(package packet, Server *server, FileSystemHandler *fs);
 void request_file(package packet, Server *server, FileSystemHandler *fs);
 void save_to_buffer(std::string message, FileSystemHandler *fs);
 void share_events(Server *server, FileSystemHandler *fs);
+void request_file_list(Server *server, std::vector<sockaddr_in> *peer_addresses);
 
 /**
  * Main
@@ -80,7 +81,8 @@ int main(int argc, char *argv[])
     std::thread listening_thread(&Server::listen, &server);
     std::thread watcher_thread(&FileSystemHandler::watch_dir, &fs);
 
-    // TODO pedir lista de arquivos para os outros peers
+    // Try to request the file list from other peers
+    request_file_list(&server, &peer_addresses);
 
     // Main loop
     while (true)
@@ -115,16 +117,14 @@ int main(int argc, char *argv[])
 
         // Check if it has a local change
         if (fs.has_events())
+        {
+            // Display the filesystem changes before removing the event
+            display_info(&server, &fs, &broadcasting_errors, &listening_errors);
+
+            // Share the change amongst the peers
             share_events(&server, &fs);
+        }
     }
-
-    // Join the threads upon ending
-    listening_thread.join();
-    watcher_thread.join();
-
-    // Show ending message
-    std::cout << "Programa finalizado!" << std::endl;
-    std::cout << std::endl;
 
     return 0;
 }
@@ -138,10 +138,8 @@ int main(int argc, char *argv[])
  */
 void display_info(Server *server, FileSystemHandler *fs, int *broadcasting_errors, int *listening_errors)
 {
-    // TODO update on fs changes
-
-    // Check if the error count has changed
-    if (server->get_broadcasting_error_count() == *broadcasting_errors && server->get_listening_error_count() == *listening_errors)
+    // Check if the error count or the filesystem has changed
+    if (!fs->has_events() && server->get_broadcasting_error_count() == *broadcasting_errors && server->get_listening_error_count() == *listening_errors)
         return;
 
     // Update error count
@@ -180,10 +178,11 @@ void remove_file(std::string file_name, FileSystemHandler *fs)
 void send_file_list(sockaddr_in sender_address, Server *server, FileSystemHandler *fs)
 {
     // Get the directory file list
-    std::string file_list = fs->get_file_list();
+    std::vector<std::string> file_list = fs->get_file_list();
 
     // Send the list
-    server->send_message(file_list, sender_address);
+    for (int i = 0; i < file_list.size(); i++)
+        server->send_message(file_list.at(i), sender_address);
 }
 
 /**
@@ -280,4 +279,22 @@ void share_events(Server *server, FileSystemHandler *fs)
 
     // Share the changes
     server->broadcast(event);
+}
+
+/**
+ * Try to ask every peer for the list of files until one receives it
+ * @param server Pointer to the server instance
+ * @param peer_addresses Pointer to the peer addresses array
+ */
+void request_file_list(Server *server, std::vector<sockaddr_in> *peer_addresses)
+{
+    std::cout << "Solicitando lista de arquivos..." << std::endl;
+    
+    for (int i = 0; i < peer_addresses->size(); i++)
+    {
+        if (server->send_message("LISTA", peer_addresses->at(i)) == -1)
+            continue;
+
+        break;
+    }
 }

@@ -52,7 +52,7 @@ public:
     int watch_dir();
     bool has_events();
     std::string get_event();
-    std::string get_file_list();
+    std::vector<std::string> get_file_list();
     int remove_file(std::string file_name);
     std::vector<std::string> get_file(std::string file_name);
     void create_file_buffer(std::string file_name, int file_size);
@@ -234,14 +234,14 @@ std::string FileSystemHandler::get_event()
  * Get the list of files on the PATH directory
  * @returns String list of files
  */
-std::string FileSystemHandler::get_file_list()
+std::vector<std::string> FileSystemHandler::get_file_list()
 {
-    std::string file_list;
+    std::vector<std::string> file_list;
 
     for (const auto &entry :
          std::filesystem::directory_iterator(PATH))
     {
-        file_list.append(std::string(entry.path()).append("\n"));
+        file_list.push_back("ANUNCIO " + std::string(entry.path().filename()) + " " + std::to_string(entry.file_size()));
     }
 
     return file_list;
