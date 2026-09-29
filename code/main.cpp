@@ -32,14 +32,14 @@ void request_file_list(Server *server, std::vector<sockaddr_in> *peer_addresses)
  */
 int main(int argc, char *argv[])
 {
-    std::string machine_name;
+    std::string machine_name = "";
 
     // Check if the machine name was provided as a parameter
     if (argc == 2)
         machine_name = std::string(argv[1]);
 
     // Try to get the machine name from docker env
-    else
+    else if (std::getenv("CONTAINER_NAME") != NULL)
         machine_name = std::getenv("CONTAINER_NAME");
 
     // Validate that the machine name has been provided
