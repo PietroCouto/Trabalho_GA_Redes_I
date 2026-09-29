@@ -19,7 +19,7 @@
  * Prototypes
  */
 void display_info(Server *server, FileSystemHandler *fs, int *broadcasting_errors, int *listening_errors);
-void remove_file(std::string file, FileSystemHandler *fs);
+void remove_file(std::string file_name, FileSystemHandler *fs);
 void send_file_list(sockaddr_in sender_address, Server *server, FileSystemHandler *fs);
 void send_file(package packet, Server *server, FileSystemHandler *fs);
 void request_file(package packet, Server *server, FileSystemHandler *fs);
@@ -33,11 +33,10 @@ int main(int argc, char *argv[])
 {
     std::string machine_name;
 
-
     // Check if the machine name was provided as a parameter
     if (argc == 2)
         machine_name = std::string(argv[1]);
-    
+
     // Try to get the machine name from docker env
     else
         machine_name = std::getenv("CONTAINER_NAME");
@@ -109,7 +108,7 @@ int main(int argc, char *argv[])
             if (packet.message.find("LISTA") != std::string::npos)
                 send_file_list(packet.sender_address, &server, &fs);
 
-            // Check if a peer has asked for the directory list
+            // Check if a peer has sent a file chunk
             if (packet.message.find("DADOS") != std::string::npos)
                 save_to_buffer(packet.message.substr(6), &fs);
         }
@@ -163,15 +162,20 @@ void display_info(Server *server, FileSystemHandler *fs, int *broadcasting_error
 }
 
 /**
- *
+ * Removes a file from the filesystem
+ * @param file_name The name of the file to remove
+ * @param fs Pointer to the filesystem handler class
  */
-void remove_file(std::string file, FileSystemHandler *fs)
+void remove_file(std::string file_name, FileSystemHandler *fs)
 {
-    fs->remove_file(file);
+    fs->remove_file(file_name);
 }
 
 /**
- *
+ * Send the list of files on the filesystem to the requesting peer
+ * @param sender_address The peer requesting the file
+ * @param server Pointer to the server instance
+ * @param fs Pointer to the filesystem handler instance
  */
 void send_file_list(sockaddr_in sender_address, Server *server, FileSystemHandler *fs)
 {
@@ -183,7 +187,10 @@ void send_file_list(sockaddr_in sender_address, Server *server, FileSystemHandle
 }
 
 /**
- *
+ * Send a file to the requesting peer
+ * @param packet The requesting peer packet
+ * @param server Pointer to the server instance
+ * @param fs Pointer to the filesystem handler instance
  */
 void send_file(package packet, Server *server, FileSystemHandler *fs)
 {
@@ -195,12 +202,15 @@ void send_file(package packet, Server *server, FileSystemHandler *fs)
         return;
 
     // Send file
-    for (int i; i < file.size(); i++)
+    for (int i = 0; i < file.size(); i++)
         server->send_message(file.at(i), packet.sender_address);
 }
 
 /**
- *
+ * Requests a file from a peer
+ * @param packet The packet that anounced the file
+ * @param server Pointer to the server instance
+ * @param fs Pointer to the filesystem handler instance
  */
 void request_file(package packet, Server *server, FileSystemHandler *fs)
 {
@@ -217,31 +227,52 @@ void request_file(package packet, Server *server, FileSystemHandler *fs)
     fs->create_file_buffer(file_name, size);
 
     // Assemble the request message
-    std::string message = "PEDIR " + header;
+    std::string message = "PEDIR " + file_name;
 
     // Request the file
     server->send_message(message, packet.sender_address);
 }
 
 /**
- *
+ * Extracts the file data from the packet and save it to the filesystem buffer
+ * @param message The packet message
+ * @param fs Pointer to the filesystem handler instance
  */
 void save_to_buffer(std::string message, FileSystemHandler *fs)
 {
+    // Get the first space position
+    int first_space = message.find(' ');
+
+    // Check for bad formatting
+    if (first_space == std::string::npos)
+        return;
+
     // Get the file name
-    std::string file_name = message.substr(0, message.find_first_of(" "));
+    std::string file_name = message.substr(0, first_space);
 
-    message = message.substr(message.find_first_of(" "));
+    // Get the second space position
+    int second_space = message.find(' ', first_space + 1);
 
-    int sequence_number = std::stoi(message.substr(0, message.find_first_of(" ")));
+    // Check for bad formatting
+    if (second_space == std::string::npos)
+        return;
 
-    message = message.substr(message.find_first_of(" "));
+    int sequence_number = 0;
 
-    fs->save_to_buffer(file_name, sequence_number, message);
-};
+    // Get the sequence number
+    sequence_number = std::stoi(message.substr(first_space + 1, second_space - (first_space + 1)));
+
+    // Remove the headers
+    std::string payload = message.substr(second_space + 1);
+
+    // Save it to the filesystem buffer
+    fs->save_to_buffer(file_name, sequence_number, payload);
+}
 
 /**
- *
+ * Get the filesystem changes and broadcasts to the other peers
+ * @param server Pointer to the server instance
+ * @param fs Pointer to the filesystem handler instance
  */
 void share_events(Server *server, FileSystemHandler *fs)
 {

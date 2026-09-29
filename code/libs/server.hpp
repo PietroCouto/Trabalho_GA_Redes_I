@@ -163,7 +163,7 @@ int Server::listen()
         sender_address_size = sizeof(sender_address);
 
         // Receive messages from the socket
-        bytes_received = recvfrom(this->socket_fd, message, sizeof(message) - 1, 0, (struct sockaddr *)&sender_address, &sender_address_size);
+        bytes_received = recvfrom(this->socket_fd, message, sizeof(message), 0, (struct sockaddr *)&sender_address, &sender_address_size);
 
         // Check for errors
         if (bytes_received == -1)
@@ -172,15 +172,10 @@ int Server::listen()
             continue;
         }
 
-        // Valid messages need to have the string terminator set
-        message[bytes_received] = '\0';
-
-        std::string message_string = std::string(message);
-
-        std::cout << message_string << std::endl;
+        std::string message_string(message, bytes_received);
 
         // Check if is just a confirmation message
-        if (message_string.find("OK") != std::string::npos)
+        if (bytes_received == 2 && message_string == "OK")
         {
             // Lock the reply mutex
             std::lock_guard<std::mutex> lock(this->reply_mtx);
@@ -286,13 +281,13 @@ int Server::send_message(std::string message, sockaddr_in destination_address)
     while (attempts < MAX_ATTEMPTS)
     {
         // Try to send the message to the destination
-        if (sendto(this->socket_fd, message.c_str(), message.length(), 0, (struct sockaddr *)&destination_address, sizeof(destination_address)) == -1)
+        if (sendto(this->socket_fd, message.data(), message.size(), 0, (struct sockaddr *)&destination_address, sizeof(destination_address)) == -1)
             return -1;
 
         std::unique_lock<std::mutex> lock(this->reply_mtx);
 
         bool received = this->reply_cv.wait_for(lock, std::chrono::seconds(1), [this, &destination_address]()
-                                                { return (this->reply.message.find("OK") != std::string::npos &&
+                                                { return (this->reply.message == "OK" &&
                                                           this->reply.sender_address.sin_addr.s_addr == destination_address.sin_addr.s_addr &&
                                                           this->reply.sender_address.sin_port == destination_address.sin_port); });
 

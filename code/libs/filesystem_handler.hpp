@@ -55,7 +55,6 @@ public:
     std::string get_file_list();
     int remove_file(std::string file_name);
     std::vector<std::string> get_file(std::string file_name);
-    int calculate_fragmentation(int file_size, int file_name_size);
     void create_file_buffer(std::string file_name, int file_size);
     int save_to_buffer(std::string file_name, int sequence_number, std::string data);
 
@@ -73,6 +72,7 @@ private:
      * Methods
      */
     int save_file(std::string file_name, std::vector<FileChunk> chunks);
+    int calculate_fragmentation(int file_size, int file_name_size);
 };
 
 /**
@@ -86,6 +86,7 @@ FileSystemHandler::FileSystemHandler()
 
     // Create a new event queue
     this->event_queue = std::queue<std::string>();
+
     this->ignore_file = "";
 
     // Create the buffer to hold the files
@@ -249,9 +250,14 @@ std::string FileSystemHandler::get_file_list()
 /**
  * Removes a file from the PATH directory
  * @param file The file to be removed
+ * @returns -1 for error, 0 for success
  */
 int FileSystemHandler::remove_file(std::string file_name)
 {
+    // Check if the file exists
+    if (!std::filesystem::exists(std::filesystem::path(PATH) / file_name))
+        return -1;
+
     // Ignore the change
     {
         std::lock_guard<std::mutex> lock(this->ignore_file_mutex);
@@ -277,51 +283,69 @@ int FileSystemHandler::remove_file(std::string file_name)
  */
 std::vector<std::string> FileSystemHandler::get_file(std::string file_name)
 {
-    std::vector<std::string> file = std::vector<std::string>();
+    // Create the vector to hold the file packets
+    std::vector<std::string> file;
 
-    // Assemble the path
+    // Assemble the file path
     std::filesystem::path file_path = std::filesystem::path(PATH) / file_name;
 
-    // Check if the file exists
-    if (!std::filesystem::exists(file_path) || std::filesystem::file_size(file_path) == 0)
+    // Check if the requested file exists
+    if (!std::filesystem::exists(file_path))
         return file;
 
     // Get the file size
     int size = std::filesystem::file_size(file_path);
 
-    // Maximum packet size minus the protocol words
-    int divide_by = 1472 - (12 + file_name.size());
+    if (size == 0)
+        return file;
 
-    // Get the total messages needed
-    int total_messages = calculate_fragmentation(size, file_name.size());
+    // Try to open the file in binary mode
+    std::ifstream config_file(file_path, std::ios::in | std::ios::binary);
 
-    // Try to open the provided file path
-    std::ifstream config_file = std::ifstream(file_path, std::ios::in | std::ios::binary);
-
-    // Check if the file has been successfully opened
+    // Check if it was successfully opened
     if (!config_file.is_open())
         return file;
 
-    std::vector<char> buffer(divide_by);
+    // Calculate how many messages will be need
+    int total_messages = calculate_fragmentation(size, file_name.size());
 
+    // Iterate through the total messages
     for (int i = 0; i < total_messages; i++)
     {
-        config_file.read(buffer.data(), divide_by);
+        // Create the message header
+        std::string header = "DADOS " + file_name + " " + std::to_string(i + 1) + " ";
+        
+        // Get the maximum payload size
+        int payload_capacity = 1472 - static_cast<int>(header.size());
 
+        // Check if the header exceeds the maximum size
+        if (payload_capacity <= 0)
+            break;
+
+        // Create the buffer
+        std::vector<char> buffer(payload_capacity);
+
+        // Read the file into the buffer
+        config_file.read(buffer.data(), payload_capacity);
+
+        // Get the total bytes read
         std::streamsize bytes_read = config_file.gcount();
 
         if (bytes_read <= 0)
             break;
 
-        std::string dados = "DADOS " + file_name + " " + std::to_string(i + 1) + " ";
+        // Create the packet
+        std::string packet = header;
 
-        dados.append(buffer.data(), bytes_read);
+        // Add the payload
+        packet.append(buffer.data(), bytes_read);
 
-        file.push_back(dados);
+        // Push the packet into the vector
+        file.push_back(packet);
     }
 
     return file;
-};
+}
 
 /**
  * Saves a bufferized file to the directory
