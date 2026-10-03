@@ -32,6 +32,11 @@ void clear_screen()
     system("clear");
 }
 
+/**
+ * Displays an error message and returns
+ * @param error_message The message to be displayed
+ * @returns -1 indicating error
+ */
 int error_message(std::string error_message) {
     std::cout << error_message << std::endl;
     return -1;
