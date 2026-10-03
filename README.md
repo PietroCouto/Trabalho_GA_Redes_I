@@ -51,12 +51,10 @@ O código foi desenvolvido para sistemas Linux. Em Windows falhará devido a pec
 # O Projeto
 
 ## main.cpp
-O código principal do projeto pode ser encontrado em ./code/main.cpp. Nele está localizada a integração entre as demais bibliotecas 
-desenvolvidas e utilizadas, bem como a lógica do protocolo utilizado.
+O código principal do projeto pode ser encontrado em ./code/main.cpp. Nele está localizada a lógica do protocolo utilizado, a chamada para as leituras de configurações, o início das threads de listening e watcher e o consumo dos eventos do filesystem.
 
 ## config_handler.cpp
-Em ./code/libs/config_handler.cpp está o primeiro módulo desenvolvido para esse projeto. É basicamente um conjunto de funções responsáveis por abrir 
-e ler as configurações das máquinas definidas em ./config/config.txt.
+Em ./code/libs/config_handler/config_handler.cpp está o primeiro módulo desenvolvido para esse projeto. É basicamente um conjunto de funções responsáveis por abrir e ler as configurações das máquinas definidas em ./config/config.txt.
 
 ## server.hpp
 Em ./code/libs/server.hpp está o coração da aplicação. Todas as funcionalidades relacionadas a redes encontram-se nesse arquivo. Nele é possível encontrar 
@@ -69,3 +67,6 @@ fila de mudanças e as funções e estruturas responsáveis por quebrar os arqui
 
 ## utils.hpp
 Em ./code/libs/utils.hpp estão três funções simples. A finalidade é apenas deixar os demais arquivos mais limpos, separando essas funções.
+
+## integration.cpp
+Em ./code/libs/integration.cpp estão as funcionalidades que antes se encontravam em ./code/main.cpp. A ideia foi limpar o código do main. São basicamente as funções que realizam a integração entre os módulos citados acima.
